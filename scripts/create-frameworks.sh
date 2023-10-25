@@ -70,6 +70,32 @@ mkdir -p "${OUTPUT_DIR}/iphonesimulator"
 ditto "${DERIVED_DATA_PATH}/Build/Products/Release-iphonesimulator/${FWNAME}.framework" "${OUTPUT_DIR}/iphonesimulator/${FWNAME}.framework"
 rm -rf "${DERIVED_DATA_PATH}"
 
+# XROS
+DERIVED_DATA_PATH=$( mktemp -d )
+xcrun xcodebuild build \
+	$COMMON_SETUP \
+    -scheme "${FWNAME} (XROS)" \
+	-derivedDataPath "${DERIVED_DATA_PATH}" \
+	-destination 'generic/platform=XROS'
+
+rm -rf "${OUTPUT_DIR}/xros"
+mkdir -p "${OUTPUT_DIR}/xros"
+ditto "${DERIVED_DATA_PATH}/Build/Products/Release-xros/${FWNAME}.framework" "${OUTPUT_DIR}/xros/${FWNAME}.framework"
+rm -rf "${DERIVED_DATA_PATH}"
+
+# XROS Simulator
+DERIVED_DATA_PATH=$( mktemp -d )
+xcrun xcodebuild build \
+	$COMMON_SETUP \
+    -scheme "${FWNAME} (XROS Simulator)" \
+	-derivedDataPath "${DERIVED_DATA_PATH}" \
+	-destination 'generic/platform=XROS Simulator'
+
+rm -rf "${OUTPUT_DIR}/xrsimulator"
+mkdir -p "${OUTPUT_DIR}/xrsimulator"
+ditto "${DERIVED_DATA_PATH}/Build/Products/Release-xrsimulator/${FWNAME}.framework" "${OUTPUT_DIR}/xrsimulator/${FWNAME}.framework"
+rm -rf "${DERIVED_DATA_PATH}"
+
 #
 
 rm -rf "${BASE_PWD}/Frameworks/iphoneos"
@@ -79,6 +105,14 @@ ditto "${OUTPUT_DIR}/iphoneos/${FWNAME}.framework" "${BASE_PWD}/Frameworks/iphon
 rm -rf "${BASE_PWD}/Frameworks/iphonesimulator"
 mkdir -p "${BASE_PWD}/Frameworks/iphonesimulator"
 ditto "${OUTPUT_DIR}/iphonesimulator/${FWNAME}.framework" "${BASE_PWD}/Frameworks/iphonesimulator/${FWNAME}.framework"
+
+rm -rf "${BASE_PWD}/Frameworks/xros"
+mkdir -p "${BASE_PWD}/Frameworks/xros"
+ditto "${OUTPUT_DIR}/xros/${FWNAME}.framework" "${BASE_PWD}/Frameworks/xros/${FWNAME}.framework"
+
+rm -rf "${BASE_PWD}/Frameworks/xrsimulator"
+mkdir -p "${BASE_PWD}/Frameworks/xrsimulator"
+ditto "${OUTPUT_DIR}/xrsimulator/${FWNAME}.framework" "${BASE_PWD}/Frameworks/xrsimulator/${FWNAME}.framework"
 
 rm -rf "${BASE_PWD}/Frameworks/macosx"
 mkdir -p "${BASE_PWD}/Frameworks/macosx"
@@ -94,6 +128,8 @@ rm -rf "${BASE_PWD}/Frameworks/${FWNAME}.xcframework"
 xcrun xcodebuild -create-xcframework \
 	-framework "${BASE_PWD}/Frameworks/iphoneos/${FWNAME}.framework" \
 	-framework "${BASE_PWD}/Frameworks/iphonesimulator/${FWNAME}.framework" \
+	-framework "${BASE_PWD}/Frameworks/xros/${FWNAME}.framework" \
+	-framework "${BASE_PWD}/Frameworks/xrsimulator/${FWNAME}.framework" \
 	-framework "${BASE_PWD}/Frameworks/macosx/${FWNAME}.framework" \
 	-framework "${BASE_PWD}/Frameworks/macosx_catalyst/${FWNAME}.framework" \
 	-output "${BASE_PWD}/Frameworks/${FWNAME}.xcframework"
