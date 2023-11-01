@@ -26,6 +26,9 @@ DEVELOPER=$(xcode-select --print-path)
 export IPHONEOS_DEPLOYMENT_VERSION="11.0"
 IPHONEOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
 IPHONESIMULATOR_SDK=$(xcrun --sdk iphonesimulator --show-sdk-path)
+export APPLETVOS_DEPLOYMENT_VERSION="11.0"
+APPLETVOS_SDK=$(xcrun --sdk appletvos --show-sdk-path)
+APPLETVSIMULATOR_SDK=$(xcrun --sdk appletvsimulator --show-sdk-path)
 export XROS_DEPLOYMENT_VERSION="1.0"
 XROS_SDK=$(xcrun --sdk xros --show-sdk-path)
 XRSIMULATOR_SDK=$(xcrun --sdk xrsimulator --show-sdk-path)
@@ -54,6 +57,12 @@ configure() {
 	 ;;
       iPhoneSimulator)
 	 SDK="${IPHONESIMULATOR_SDK}"
+	 ;;
+      AppleTVOS)
+	 SDK="${APPLETVOS_SDK}"
+	 ;;
+      AppleTVSimulator)
+	 SDK="${APPLETVSIMULATOR_SDK}"
 	 ;;
       XROS)
      SDK="${XROS_SDK}"
@@ -84,17 +93,21 @@ configure() {
    
 
    if [ "$OS" == "MacOSX" ]; then
-      ${SRC_DIR}/Configure macos-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure macos-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    elif [ "$OS" == "MacOSX_Catalyst" ]; then
-      ${SRC_DIR}/Configure mac-catalyst-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure mac-catalyst-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    elif [ "$OS" == "iPhoneSimulator" ]; then
-      ${SRC_DIR}/Configure ios-sim-cross-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure ios-sim-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    elif [ "$OS" == "iPhoneOS" ]; then
-      ${SRC_DIR}/Configure ios-cross-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure ios-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+   elif [ "$OS" == "AppleTVSimulator" ]; then
+      ${SRC_DIR}/Configure tvos-sim-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+   elif [ "$OS" == "AppleTVOS" ]; then
+      ${SRC_DIR}/Configure tvos-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    elif [ "$OS" == "XRSimulator" ]; then
-      ${SRC_DIR}/Configure xros-sim-cross-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure xros-sim-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    elif [ "$OS" == "XROS" ]; then
-      ${SRC_DIR}/Configure xros-cross-$ARCH no-asm no-shared --prefix="${PREFIX}" &> "${PREFIX}.config.log"
+      ${SRC_DIR}/Configure xros-cross-$ARCH no-asm no-shared no-tests --prefix="${PREFIX}" &> "${PREFIX}.config.log"
    fi
 }
 
@@ -200,6 +213,64 @@ build_ios() {
    # Update include "openssl/" to "OpenSSL/"
    grep -rl '#\s*include\s*<openssl' --include \*.h ${SCRIPT_DIR}/../iphoneos/include | xargs -I@ sed -i '' -e 's/#[[:space:]]*include[[:space:]]*<openssl/#include <OpenSSL/gi' @
    grep -rl '#\s*include\s*<openssl' --include \*.h ${SCRIPT_DIR}/../iphonesimulator/include | xargs -I@ sed -i '' -e 's/#[[:space:]]*include[[:space:]]*<openssl/#include <OpenSSL/gi' @
+
+   rm -rf ${TMP_BUILD_DIR}
+}
+
+build_appletvos() {
+   local TMP_BUILD_DIR=$( mktemp -d )
+
+   # Clean up whatever was left from our previous build
+   rm -rf "${SCRIPT_DIR}"/../{appletvsimulator/include,appletvsimulator/lib}
+   mkdir -p "${SCRIPT_DIR}"/../{appletvsimulator/include,appletvsimulator/lib}
+
+   build "x86_64" "AppleTVSimulator" ${TMP_BUILD_DIR} "appletvsimulator"
+   build "arm64" "AppleTVSimulator" ${TMP_BUILD_DIR} "appletvsimulator"
+
+   # The World is not ready for arm64e!
+   # build "arm64e" "AppleTVSimulator" ${TMP_BUILD_DIR} "appletvsimulator"
+
+   rm -rf "${SCRIPT_DIR}"/../{appletvos/include,appletvos/lib}
+   mkdir -p "${SCRIPT_DIR}"/../{appletvos/include,appletvos/lib}
+
+   build "arm64" "AppleTVOS" ${TMP_BUILD_DIR} "appletvos"
+
+   # The World is not ready for arm64e!
+   # build "arm64e" "AppleTVOS" ${TMP_BUILD_DIR} "appletvos"
+
+   ditto "${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVOS-arm64/include/openssl" "${SCRIPT_DIR}/../appletvos/include/${FWNAME}"
+   cp -f "${SCRIPT_DIR}/../shim/shim.h" "${SCRIPT_DIR}/../appletvos/include/${FWNAME}/shim.h"
+
+   # Copy headers
+   ditto "${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVSimulator-arm64/include/openssl" "${SCRIPT_DIR}/../appletvsimulator/include/${FWNAME}"
+   cp -f "${SCRIPT_DIR}/../shim/shim.h" "${SCRIPT_DIR}/../appletvsimulator/include/${FWNAME}/shim.h"
+
+   # fix inttypes.h
+   find "${SCRIPT_DIR}/../appletvos/include/${FWNAME}" -type f -name "*.h" -exec sed -i "" -e "s/include <inttypes\.h>/include <sys\/types\.h>/g" {} \;
+   find "${SCRIPT_DIR}/../appletvsimulator/include/${FWNAME}" -type f -name "*.h" -exec sed -i "" -e "s/include <inttypes\.h>/include <sys\/types\.h>/g" {} \;
+
+   local OPENSSLCONF_PATH="${SCRIPT_DIR}/../appletvsimulator/include/${FWNAME}/opensslconf.h"
+   echo "#if defined(__APPLE__) && defined (__x86_64__)" >> ${OPENSSLCONF_PATH}
+   cat ${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVSimulator-x86_64/include/openssl/opensslconf.h >> ${OPENSSLCONF_PATH}
+   # The World is not ready for arm64e!
+   # echo "#elif defined(__APPLE__) && defined (__arm64e__)" >> ${OPENSSLCONF_PATH}
+   # cat ${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVSimulator-arm64e/include/openssl/opensslconf.h >> ${OPENSSLCONF_PATH}
+   echo "#elif defined(__APPLE__) && defined (__arm64__)" >> ${OPENSSLCONF_PATH}
+   cat ${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVSimulator-arm64/include/openssl/opensslconf.h >> ${OPENSSLCONF_PATH}
+   echo "#endif" >> ${OPENSSLCONF_PATH}
+
+   OPENSSLCONF_PATH="${SCRIPT_DIR}/../appletvos/include/${FWNAME}/opensslconf.h"
+   echo "#if defined(__APPLE__) && defined (__x86_64__)" >> ${OPENSSLCONF_PATH}
+   # The World is not ready for arm64e!
+   # echo "#elif defined(__APPLE__) && defined (__arm64e__)" >> ${OPENSSLCONF_PATH}
+   # cat ${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVOS-arm64e/include/openssl/opensslconf.h >> ${OPENSSLCONF_PATH}
+   echo "#elif defined(__APPLE__) && defined (__arm64__)" >> ${OPENSSLCONF_PATH}
+   cat ${TMP_BUILD_DIR}/${OPENSSL_VERSION}-AppleTVOS-arm64/include/openssl/opensslconf.h >> ${OPENSSLCONF_PATH}
+   echo "#endif" >> ${OPENSSLCONF_PATH}
+   
+   # Update include "openssl/" to "OpenSSL/"
+   grep -rl '#\s*include\s*<openssl' --include \*.h ${SCRIPT_DIR}/../appletvos/include | xargs -I@ sed -i '' -e 's/#[[:space:]]*include[[:space:]]*<openssl/#include <OpenSSL/gi' @
+   grep -rl '#\s*include\s*<openssl' --include \*.h ${SCRIPT_DIR}/../appletvsimulator/include | xargs -I@ sed -i '' -e 's/#[[:space:]]*include[[:space:]]*<openssl/#include <OpenSSL/gi' @
 
    rm -rf ${TMP_BUILD_DIR}
 }
@@ -346,6 +417,7 @@ if [ ! -f "${SCRIPT_DIR}/../openssl-${OPENSSL_VERSION}.tar.gz" ]; then
    rm -f "${SCRIPT_DIR}/../openssl-${OPENSSL_VERSION}.tar.gz.sha256"
 fi
 
+build_appletvos
 build_xros
 build_ios
 build_macos
