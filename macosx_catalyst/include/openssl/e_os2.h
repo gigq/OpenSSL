@@ -16,6 +16,7 @@
 #  define HEADER_E_OS2_H
 # endif
 
+#include <stdint.h>
 #include <OpenSSL/opensslconf.h>
 
 #ifdef  __cplusplus
